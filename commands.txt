@@ -1,2 +1,3 @@
 # on the victim container that will ping (example: hostA)
 docker exec -it hostA-10.9.0.5 bash -c "sudo arp -s 10.9.0.99 aa:aa:aa:aa:aa:aa || true"
+sudo tcpdump -r /tmp/sniff_spoof.pcap -nn -vv > /tmp/sniff_spoof.txt

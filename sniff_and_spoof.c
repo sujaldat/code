@@ -1,3 +1,11 @@
+/*
+sniff_and_spoof_minimal.c
+
+Listens for ICMP Echo Requests (aka pings) on a given network interface,
+then replies with forged Echo Replies : kind of like a basic spoofing responder.
+
+Note: Run this as root. It wont work (ik you know that).
+*/
 #include <pcap.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,136 +16,117 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* -- checksum helper: standard 16-bit ones-complement checksum -- */
-static unsigned short csum(void *b, int len) {
-    unsigned short *buf = b;
-    unsigned int sum = 0;
-    while (len > 1) {
-        sum += *buf++;
+// Basic checksum routine for IP/ICMP 
+static unsigned short calc_checksum(void *data, int len) {
+    unsigned short *ptr = data;
+    unsigned int sum= 0;
+    while (len >1) {
+        sum += *ptr++;
         len -= 2;
     }
-    if (len == 1) sum += *(unsigned char*)buf;
-    sum = (sum >> 16) + (sum & 0xffff);
-    sum += (sum >> 16);
-    return (unsigned short)(~sum);
+    if (len == 1)sum +=*(unsigned char *)ptr;
+    // fold 32-bit to 16-bit and return one's complement
+    sum = (sum >> 16)+(sum & 0xffff);
+    sum += (sum >>16);
+    return ~sum;
+}
+// Socket for sending forged replies
+int raw_socket =-1;
+// Build and send a fake ICMP Echo Reply based on the captured request
+void send_icmp_reply(const u_char *packet, int pkt_len) {
+    struct iphdr *incoming_ip = (struct iphdr *)packet;
+    int ip_header_len = incoming_ip->ihl *4;
+    // sanity: make sure there's room for an ICMP header
+    if (pkt_len < ip_header_len+(int)sizeof(struct icmphdr)) return;
+    struct icmphdr *icmp_req =(struct icmphdr *)(packet + ip_header_len);
+    if (icmp_req->type != ICMP_ECHO)
+        return; // not a ping? so skiping it
+    int data_len = pkt_len -ip_header_len- sizeof(struct icmphdr);
+    int full_len = sizeof(struct iphdr) + sizeof(struct icmphdr) + data_len;
+    char *reply_buf = malloc(full_len);
+    if (!reply_buf) return;
+    memset(reply_buf,0,full_len);
+    struct iphdr *ip_out =(struct iphdr *)reply_buf;
+    struct icmphdr *icmp_out =(struct icmphdr *)(reply_buf +sizeof(struct iphdr));
+    char *payload = reply_buf+ sizeof(struct iphdr) + sizeof(struct icmphdr);
+    // copy over the original data/payload if there's any
+    if (data_len >0)
+        memcpy(payload, packet + ip_header_len + sizeof(struct icmphdr), data_len);
+    // build the ICMP header
+    icmp_out->type =ICMP_ECHOREPLY;
+    icmp_out->code =0;
+    icmp_out->un.echo.id= icmp_req->un.echo.id;
+    icmp_out->un.echo.sequence= icmp_req->un.echo.sequence;
+    icmp_out->checksum= 0;
+    icmp_out->checksum= calc_checksum(icmp_out, sizeof(struct icmphdr) + data_len);
+    // now building the IP header
+    ip_out->ihl=5;
+    ip_out->version=4;
+    ip_out->tos =0;
+    ip_out->tot_len= htons(full_len);
+    ip_out->id = 0;  // could randomize this if needed ()
+    ip_out->frag_off=0;
+    ip_out->ttl=64;
+    ip_out->protocol = IPPROTO_ICMP;
+    ip_out->saddr= incoming_ip->daddr;  // swap src / dst
+    ip_out->daddr= incoming_ip->saddr;
+    ip_out->check= 0;
+    ip_out->check= calc_checksum(ip_out, ip_out->ihl *4);
+    // send it out
+    struct sockaddr_in target_addr ={0};
+    target_addr.sin_family =AF_INET;
+    target_addr.sin_addr.s_addr= ip_out->daddr;
+
+    sendto(raw_socket, reply_buf,full_len, 0,
+           (struct sockaddr *)&target_addr,sizeof(target_addr));
+
+    free(reply_buf);
 }
 
-/* raw socket descriptor used to inject crafted IP packets with IP_HDRINCL */
-static int rawfd = -1;
-
-/*
- send_reply:
-  - ip_pkt: pointer to the start of an IPv4 packet (network byte order)
-  - plen: length of IPv4 packet in bytes
-  - constructs an IPv4 + ICMP echo-reply packet with:
-      src = original dst, dst = original src
-      ICMP id/seq copied from request
-      payload copied unchanged
-  - sends packet via raw socket (IP_HDRINCL must be enabled)
-*/
-void send_reply(const u_char *ip_pkt, int plen) {
-    struct iphdr *rip = (struct iphdr*)ip_pkt;
-    int ihl = rip->ihl * 4;
-    /* require minimum IP + ICMP header length */
-    if (plen < ihl + (int)sizeof(struct icmphdr)) return;
-
-    struct icmphdr *req = (struct icmphdr*)(ip_pkt + ihl);
-    /* only respond to echo requests (type 8) */
-    if (req->type != ICMP_ECHO) return;
-
-    int data_len = plen - ihl - sizeof(struct icmphdr);
-    int pktlen = sizeof(struct iphdr) + sizeof(struct icmphdr) + data_len;
-
-    /* allocate packet buffer for reply (IP + ICMP + payload) */
-    char *pkt = malloc(pktlen);
-    if (!pkt) return;
-    memset(pkt, 0, pktlen);
-
-    struct iphdr *iph = (struct iphdr*)pkt;
-    struct icmphdr *ic = (struct icmphdr*)(pkt + sizeof(struct iphdr));
-    char *payload_dst = pkt + sizeof(struct iphdr) + sizeof(struct icmphdr);
-
-    /* copy payload (if present) from request to reply */
-    if (data_len > 0) {
-        memcpy(payload_dst, ip_pkt + ihl + sizeof(struct icmphdr), data_len);
-    }
-
-    /* populate ICMP reply header */
-    ic->type = ICMP_ECHOREPLY;                 /* 0 */
-    ic->code = 0;
-    ic->un.echo.id = req->un.echo.id;          /* copy id */
-    ic->un.echo.sequence = req->un.echo.sequence; /* copy seq */
-    ic->checksum = 0;
-    ic->checksum = csum(ic, sizeof(struct icmphdr) + data_len);
-
-    /* populate IP header (simple, minimal fields) */
-    iph->ihl = 5;
-    iph->version = 4;
-    iph->tos = 0;
-    iph->tot_len = htons(pktlen);
-    iph->id = htons(0);
-    iph->frag_off = 0;
-    iph->ttl = 64;
-    iph->protocol = IPPROTO_ICMP;
-    iph->saddr = rip->daddr; /* reply source = original dst */
-    iph->daddr = rip->saddr; /* reply dest   = original src */
-    iph->check = 0;
-    iph->check = csum(iph, iph->ihl * 4);
-
-    /* destination sockaddr for sendto */
-    struct sockaddr_in sin;
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = iph->daddr;
-
-    /* inject packet */
-    sendto(rawfd, pkt, pktlen, 0, (struct sockaddr*)&sin, sizeof(sin));
-
-    free(pkt);
+// pcap callback: strip off Ethernet header, check protocol, maybe spoof
+void sniff_cb(u_char *user, const struct pcap_pkthdr *hdr, const u_char *frame) {
+    if (hdr->caplen < 14) return;  // false
+    const u_char *ip_packet = frame + 14;
+    struct iphdr *ip = (struct iphdr *)ip_packet;
+    if (ip->version != 4) return;
+    if (ip->protocol != IPPROTO_ICMP) return;
+    send_icmp_reply(ip_packet, hdr->caplen -14);
 }
 
-/*
- pcap callback:
-  - receives full link-layer frame; this code assumes Ethernet and strips 14-octet header.
-  - checks IPv4 & ICMP; if an ICMP echo-request is found, calls send_reply.
-*/
-void pkt_cb(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
-    if (h->caplen < 14) return;                 /* not an Ethernet frame */
-    const u_char *ip_pkt = bytes + 14;          /* skip Ethernet header */
-    struct iphdr *iph = (struct iphdr*)ip_pkt;
-    if (iph->version != 4) return;
-    if (iph->protocol != IPPROTO_ICMP) return;
-    int ip_plen = h->caplen - 14;               /* IPv4 packet length captured */
-    send_reply(ip_pkt, ip_plen);
-}
-
+// main: open capture and injection sockets, loop forever
 int main(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "usage: %s <interface>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <interface>\n", argv[0]);
         return 1;
     }
     char *iface = argv[1];
     char errbuf[PCAP_ERRBUF_SIZE];
 
-    /* open pcap in promiscuous mode to capture ICMP frames at link layer */
     pcap_t *pcap = pcap_open_live(iface, 65535, 1, 1000, errbuf);
-    if (!pcap) {
-        fprintf(stderr, "pcap_open_live failed: %s\n", errbuf);
+    if(!pcap) {
+        fprintf(stderr,"pcap_open_live failed: -- %s\n", errbuf);
         return 1;
     }
-
-    /* open raw socket for injection and enable IP_HDRINCL */
-    rawfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    if (rawfd < 0) { perror("socket"); pcap_close(pcap); return 1; }
-    int one = 1;
-    if (setsockopt(rawfd, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-        perror("setsockopt(IP_HDRINCL)");
-        close(rawfd); pcap_close(pcap); return 1;
+    raw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+    if (raw_socket <0) {
+        perror("socket");
+        pcap_close(pcap);
+        return 1;
     }
-
-    /* optional BPF filter can be set here (omitted to keep minimal) */
-    pcap_loop(pcap, -1, pkt_cb, NULL);
-
-    close(rawfd);
+    int enable =1;
+    if (setsockopt(raw_socket, IPPROTO_IP, IP_HDRINCL, &enable, sizeof(enable)) < 0) {
+        perror("setsockopt(IP_HDRINCL) :");
+        close(raw_socket);
+        pcap_close(pcap);
+        return 1;
+    }
+    // sniff packets forever
+    pcap_loop(pcap, -1, sniff_cb, NULL);
+    // should never get here, but just in case
+    close(raw_socket);
     pcap_close(pcap);
     return 0;
 }
+
+
+

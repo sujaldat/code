@@ -1,11 +1,3 @@
-/*
-sniff_and_spoof_minimal.c
-
-Listens for ICMP Echo Requests (aka pings) on a given network interface,
-then replies with forged Echo Replies : kind of like a basic spoofing responder.
-
-Note: Run this as root. It wont work (ik you know that).
-*/
 #include <pcap.h>
 #include <stdio.h>
 #include <stdlib.h>

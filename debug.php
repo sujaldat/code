@@ -3,25 +3,31 @@ SEED Lab: SQL Injection Education Web plateform
 Author: Kailiang Ying
 Email: kying@syr.edu
 -->
+
 <!--
 SEED Lab: SQL Injection Education Web plateform
 Enhancement Version 1
 Date: 12th April 2018
 Developer: Kuber Kohli
+
 Update: Implemented the new bootsrap design. Implemented a new Navbar at the top with two menu options for Home and edit profile, with a button to
 logout. The profile details fetched will be displayed using the table class of bootstrap with a dark table head theme.
+
 NOTE: please note that the navbar items should appear only for users and the page with error login message should not have any of these items at
 all. Therefore the navbar tag starts before the php tag but it end within the php script adding items as required.
 -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <!-- Required meta tags -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="css/bootstrap.min.css">
   <link href="css/style_home.css" type="text/css" rel="stylesheet">
+
   <!-- Browser Tab title -->
   <title>SQLi Lab</title>
 </head>
@@ -29,17 +35,20 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
   <nav class="navbar fixed-top navbar-expand-lg navbar-light" style="background-color: #3EA055;">
     <div class="collapse navbar-collapse" id="navbarTogglerDemo01">
       <a class="navbar-brand" href="unsafe_home.php" ><img src="seed_logo.png" style="height: 40px; width: 200px;" alt="SEEDLabs"></a>
+
       <?php
       session_start();
       // if the session is new extract the username password from the GET request
       $input_uname = $_GET['username'];
       $input_pwd = $_GET['Password'];
       $hashed_pwd = sha1($input_pwd);
+
       // check if it has exist login session
       if($input_uname=="" and $hashed_pwd==sha1("") and $_SESSION['name']!="" and $_SESSION['pwd']!=""){
         $input_uname = $_SESSION['name'];
         $hashed_pwd = $_SESSION['pwd'];
       }
+
       // Function to create a sql connection.
       function getDB() {
         $dbhost="10.9.0.6";
@@ -57,46 +66,50 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
         }
         return $conn;
       }
+
       // create a connection
       $conn = getDB();
       // Sql query to authenticate the user
       $sql = "SELECT id, name, eid, salary, birth, ssn, phoneNumber, address, email,nickname,Password
       FROM credential
       WHERE name= '$input_uname' and Password='$hashed_pwd'";
-      
+
       // Modified to use multi_query for bonus task 3.11.4
-      if ($conn->multi_query($sql)) {
-          $return_arr = array();
-          
-          // Process all result sets
-          do {
-              if ($result = $conn->store_result()) {
-                  // Only fetch data from first result set (the SELECT)
-                  if (empty($return_arr)) {
-                      while($row = $result->fetch_assoc()){
-                          array_push($return_arr,$row);
-                      }
-                  }
-                  $result->free();
-              }
-              // Check for errors
-              if ($conn->errno) {
-                  echo "</div>";
-                  echo "</nav>";
-                  echo "<div class='container text-center'>";
-                  die('There was an error running the query [' . $conn->error . ']\n');
-                  echo "</div>";
-              }
-          } while ($conn->more_results() && $conn->next_result());
-          
-      } else {
-          echo "</div>";
-          echo "</nav>";
-          echo "<div class='container text-center'>";
-          die('There was an error running the query [' . $conn->error . ']\n');
-          echo "</div>";
-      }
-      
+if ($conn->multi_query($sql)) {
+    $return_arr = array();
+    
+    // Process all result sets
+    do {
+        if ($result = $conn->store_result()) {
+            // Only fetch data from first result set (the SELECT)
+            if (empty($return_arr)) {
+                while($row = $result->fetch_assoc()){
+                    array_push($return_arr,$row);
+                }
+            }
+            $result->free();
+        }
+        // Check for errors
+        if ($conn->errno) {
+            echo "</div>";
+            echo "</nav>";
+            echo "<div class='container text-center'>";
+            die('There was an error running the query [' . $conn->error . ']\n');
+            echo "</div>";
+        }
+    } while ($conn->more_results() && $conn->next_result());
+    
+} else {
+    echo "</div>";
+    echo "</nav>";
+    echo "<div class='container text-center'>";
+    die('There was an error running the query [' . $conn->error . ']\n');
+    echo "</div>";
+}
+
+
+
+
       /* convert the array type to json format and read out*/
       $json_str = json_encode($return_arr);
       $json_a = json_decode($json_str,true);
@@ -129,6 +142,7 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
       }
       // close the sql connection
       $conn->close();
+
       function drawLayout($id,$name,$eid,$salary,$birth,$ssn,$pwd,$nickname,$email,$address,$phoneNumber){
         if($id!=""){
           session_start();

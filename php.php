@@ -300,16 +300,11 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
 
 ----
 
-
 use sqllab_users;
 
--- First, verify Alice exists
-SELECT * FROM credential WHERE name='Alice';
+-- Insert Alice back with her original data
+INSERT INTO credential (name, eid, salary, birth, ssn, password, nickname, email, address, phoneNumber) 
+VALUES ('Alice', '10000', '20000', '9/20', '10211002', 'fdbe918bdae83000aa54747fc95fe0470fff4976', 'Alice', 'alice@seed.com', '1 Main St', '5551234');
 
--- Now try the multi-statement exactly as injection would create it
-SELECT id, name, eid, salary, birth, ssn, phoneNumber, address, email,nickname,Password 
-FROM credential 
-WHERE name='admin'; DELETE FROM credential WHERE name='Alice';
-
--- Check if Alice is gone
+-- Verify Alice is back
 SELECT * FROM credential WHERE name='Alice';

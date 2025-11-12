@@ -294,3 +294,22 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
     </script>
   </body>
   </html>
+
+
+
+
+----
+
+
+use sqllab_users;
+
+-- First, verify Alice exists
+SELECT * FROM credential WHERE name='Alice';
+
+-- Now try the multi-statement exactly as injection would create it
+SELECT id, name, eid, salary, birth, ssn, phoneNumber, address, email,nickname,Password 
+FROM credential 
+WHERE name='admin'; DELETE FROM credential WHERE name='Alice';
+
+-- Check if Alice is gone
+SELECT * FROM credential WHERE name='Alice';

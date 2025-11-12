@@ -1,56 +1,63 @@
-<?php
-$input_uname = $_GET['username'];
-$input_pwd = $_GET['Password'];
-$hashed_pwd = sha1($input_pwd);
+<!--
+SEED Lab: SQL Injection Education Web plateform
+Author: Kailiang Ying
+Email: kying@syr.edu
+-->
+<!--
+SEED Lab: SQL Injection Education Web plateform
+Enhancement Version 1.
+Date: 10th April 2018.
+Developer: Kuber Kohli.
 
-$sql = "SELECT id, name, eid, salary, birth, ssn, phoneNumber, address, email,nickname,Password
-FROM credential
-WHERE name= '$input_uname' and Password='$hashed_pwd'";
+Update: The password was stored in the session was updated when password is changed.
+-->
 
-echo "<h2>FULL SQL QUERY:</h2>";
-echo "<pre>" . htmlspecialchars($sql) . "</pre>";
-echo "<hr>";
+<!DOCTYPE html>
+<html>
+<body>
 
-// Now try to execute it
-$dbhost="10.9.0.6";
-$dbuser="seed";
-$dbpass="dees";
-$dbname="sqllab_users";
-$conn = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
+  <?php
+  session_start();
+  $input_email = $_GET['Email'];
+  $input_nickname = $_GET['NickName'];
+  $input_address= $_GET['Address'];
+  $input_pwd = $_GET['Password'];
+  $input_phonenumber = $_GET['PhoneNumber'];
+  $uname = $_SESSION['name'];
+  $eid = $_SESSION['eid'];
+  $id = $_SESSION['id'];
 
-if ($conn->multi_query($sql)) {
-    echo "<h3>✓ multi_query executed successfully!</h3>";
-    
-    do {
-        if ($result = $conn->store_result()) {
-            echo "Result set: " . $result->num_rows . " rows<br>";
-            $result->free();
-        } else {
-            if ($conn->errno) {
-                echo "<b>ERROR:</b> " . $conn->error . "<br>";
-            } else {
-                echo "No result set. Affected rows: " . $conn->affected_rows . "<br>";
-            }
-        }
-    } while ($conn->more_results() && $conn->next_result());
-    
-    echo "<br><b>All queries processed.</b><br>";
-} else {
-    echo "<h3>✗ multi_query FAILED</h3>";
-    echo "<b>ERROR:</b> " . $conn->error . "<br>";
-}
+  function getDB() {
+    $dbhost="10.9.0.6";
+    $dbuser="seed";
+    $dbpass="dees";
+    $dbname="sqllab_users";
+    // Create a DB connection
+    $conn = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
+    if ($conn->connect_error) {
+      die("Connection failed: " . $conn->connect_error . "\n");
+    }
+    return $conn;
+  }
 
-// Check if Alice exists
-echo "<hr><h3>Checking if Alice exists:</h3>";
-$check = $conn->query("SELECT name FROM credential WHERE name='Alice'");
-if ($check && $check->num_rows > 0) {
-    echo "❌ Alice STILL EXISTS";
-} else {
-    echo "✅ Alice DELETED!";
-}
-?>
-```
+  $conn = getDB();
+  // Don't do this, this is not safe against SQL injection attack
+  $sql="";
+  if($input_pwd!=''){
+    // In case password field is not empty.
+    $hashed_pwd = sha1($input_pwd);
+    //Update the password stored in the session.
+    $_SESSION['pwd']=$hashed_pwd;
+    $sql = "UPDATE credential SET nickname='$input_nickname',email='$input_email',address='$input_address',Password='$hashed_pwd',PhoneNumber='$input_phonenumber' where ID=$id;";
+  }else{
+    // if passowrd field is empty.
+    $sql = "UPDATE credential SET nickname='$input_nickname',email='$input_email',address='$input_address',PhoneNumber='$input_phonenumber' where ID=$id;";
+  }
+  $conn->query($sql);
+  $conn->close();
+  header("Location: unsafe_home.php");
+  exit();
+  ?>
 
-Now visit with this URL and **show me the complete output**:
-```
-http://www.seed-server.com/unsafe_home.php?username=admin';%20DELETE%20FROM%20credential%20WHERE%20name='Alice';%20--%20&Password=test
+</body>
+</html>

@@ -73,37 +73,41 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
       $sql = "SELECT id, name, eid, salary, birth, ssn, phoneNumber, address, email,nickname,Password
       FROM credential
       WHERE name= '$input_uname' and Password='$hashed_pwd'";
-      // if (!$result = $conn->mysqli_multi_query($sql)) {
-      //   echo "</div>";
-      //   echo "</nav>";
-      //   echo "<div class='container text-center'>";
-      //   die('There was an error running the query [' . $conn->error . ']\n');
-      //   echo "</div>";
-      // }
-      // /* convert the select return result into array type */
-      // $return_arr = array();
-      // while($row = $result->fetch_assoc()){
-      //   array_push($return_arr,$row);
-      // }
-      $conn->multi_query($sql);
-      $result = $conn->store_result();
       
-      if($result){
-        $return_arr = array();  // Changed from $result_arr to $return_arr
-        while($row=$result->fetch_assoc()){
-          array_push($return_arr,$row);
-        }
-        $result->free();  // Changed from $result_arr=free() to $result->free()
-      }else{
-        $return_arr=array();  // Added semicolon
+      // Execute multi_query to allow SQL injection with multiple statements
+      if ($conn->multi_query($sql)) {
+          // Initialize return array
+          $return_arr = array();
+          
+          // Process ALL result sets
+          do {
+              // Store current result set
+              if ($result = $conn->store_result()) {
+                  // Only fetch data from first result set (the SELECT)
+                  if (empty($return_arr)) {
+                      while($row = $result->fetch_assoc()){
+                          array_push($return_arr,$row);
+                      }
+                  }
+                  $result->free();
+              }
+              // Check for errors in this result set
+              if ($conn->errno) {
+                  echo "</div>";
+                  echo "</nav>";
+                  echo "<div class='container text-center'>";
+                  die('There was an error running the query [' . $conn->error . ']\n');
+                  echo "</div>";
+              }
+          } while ($conn->more_results() && $conn->next_result());
+          
+      } else {
+          echo "</div>";
+          echo "</nav>";
+          echo "<div class='container text-center'>";
+          die('There was an error running the query [' . $conn->error . ']\n');
+          echo "</div>";
       }
-      
-      while($conn->next_result()){
-        if($res = $conn->store_result()){
-          $res->free();
-        }
-      }
-
 
       /* convert the array type to json format and read out*/
       $json_str = json_encode($return_arr);
@@ -210,13 +214,22 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
           $conn = getDB();
           $sql = "SELECT id, name, eid, salary, birth, ssn, password, nickname, email, address, phoneNumber
           FROM credential";
-          if (!$result = $conn->mysqli_multi_query($sql)) {
-            die('There was an error running the query [' . $conn->error . ']\n');
+          
+          // Use multi_query for admin section too
+          if ($conn->multi_query($sql)) {
+              $return_arr = array();
+              do {
+                  if ($result = $conn->store_result()) {
+                      while($row = $result->fetch_assoc()){
+                          array_push($return_arr,$row);
+                      }
+                      $result->free();
+                  }
+              } while ($conn->more_results() && $conn->next_result());
+          } else {
+              die('There was an error running the query [' . $conn->error . ']\n');
           }
-          $return_arr = array();
-          while($row = $result->fetch_assoc()){
-            array_push($return_arr,$row);
-          }
+          
           $json_str = json_encode($return_arr);
           $json_aa = json_decode($json_str,true);
           $conn->close();
@@ -294,17 +307,3 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
     </script>
   </body>
   </html>
-
-
-
-
-----
-
-use sqllab_users;
-
--- Insert Alice back with her original data
-INSERT INTO credential (name, eid, salary, birth, ssn, password, nickname, email, address, phoneNumber) 
-VALUES ('Alice', '10000', '20000', '9/20', '10211002', 'fdbe918bdae83000aa54747fc95fe0470fff4976', 'Alice', 'alice@seed.com', '1 Main St', '5551234');
-
--- Verify Alice is back
-SELECT * FROM credential WHERE name='Alice';

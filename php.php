@@ -87,17 +87,17 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
       // }
       $conn->multi_query($sql);
       $result = $conn->store_result();
-
+      
       if($result){
-        $result_arr = array();
+        $return_arr = array();  // Changed from $result_arr to $return_arr
         while($row=$result->fetch_assoc()){
-          array_push($result_arr,$row);
+          array_push($return_arr,$row);
         }
-        $result_arr=free();
+        $result->free();  // Changed from $result_arr=free() to $result->free()
       }else{
-        $return_arr=array()
+        $return_arr=array();  // Added semicolon
       }
-
+      
       while($conn->next_result()){
         if($res = $conn->store_result()){
           $res->free();

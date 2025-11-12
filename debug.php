@@ -74,30 +74,27 @@ all. Therefore the navbar tag starts before the php tag but it end within the ph
       FROM credential
       WHERE name= '$input_uname' and Password='$hashed_pwd'";
 
+
+
       // Modified to use multi_query for bonus task 3.11.4
 if ($conn->multi_query($sql)) {
     $return_arr = array();
     
-    // Process all result sets
-    do {
+    // Get first result set (the SELECT query)
+    if ($result = $conn->store_result()) {
+        while($row = $result->fetch_assoc()){
+            array_push($return_arr,$row);
+        }
+        $result->free();
+    }
+    
+    // Process remaining result sets (like DELETE)
+    // This is CRITICAL - without this loop, DELETE won't execute!
+    while ($conn->next_result()) {
         if ($result = $conn->store_result()) {
-            // Only fetch data from first result set (the SELECT)
-            if (empty($return_arr)) {
-                while($row = $result->fetch_assoc()){
-                    array_push($return_arr,$row);
-                }
-            }
             $result->free();
         }
-        // Check for errors
-        if ($conn->errno) {
-            echo "</div>";
-            echo "</nav>";
-            echo "<div class='container text-center'>";
-            die('There was an error running the query [' . $conn->error . ']\n');
-            echo "</div>";
-        }
-    } while ($conn->more_results() && $conn->next_result());
+    }
     
 } else {
     echo "</div>";

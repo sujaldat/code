@@ -1,43 +1,81 @@
+#!/bin/bash
+
+# Complete reset script for PKI Lab
+# This removes all created files and directories, then starts fresh
+
+echo "=== Starting complete reset ==="
+
+# Remove all CA and certificate files
+rm -rf demoCA
+rm -f ca.key ca.crt
+rm -f server.key server.csr server.crt
+rm -f openssl.cnf
+
+echo "✓ Removed old CA and certificates"
+
+# Copy fresh OpenSSL config
+cp /usr/lib/ssl/openssl.cnf .
+echo "✓ Copied fresh openssl.cnf"
+
+# Create demoCA directory structure
+mkdir -p demoCA/certs
+mkdir -p demoCA/crl
+mkdir -p demoCA/newcerts
+touch demoCA/index.txt
+echo 1000 > demoCA/serial
+
+echo "✓ Created demoCA directory structure"
+
+# Step 1: Create CA certificate (self-signed)
+echo ""
+echo "=== Step 1: Creating CA Certificate ==="
+echo "Creating CA key and certificate..."
+openssl req -new -x509 -keyout ca.key -out ca.crt -config openssl.cnf -days 3650 \
+    -subj "/CN=CSE365-CA/O=CSE365/C=US" \
+    -passout pass:dees
+
+echo "✓ CA certificate created"
+echo ""
+echo "CA Files created:"
+ls -la ca.key ca.crt
+
+# Step 2: Create Server CSR with SANs
+echo ""
+echo "=== Step 2: Creating Server Certificate Signing Request (CSR) ==="
+openssl req -newkey rsa:2048 -sha256 \
+    -keyout server.key -out server.csr \
+    -subj "/CN=www.sujaldat2025.com/O=Sujal Org/C=US" \
+    -passout pass:dees \
+    -addext "subjectAltName = DNS:www.sujaldat2025.com, \
+                              DNS:www.sujaldat2025A.com, \
+                              DNS:www.sujaldat2025B.com"
+
+echo "✓ Server CSR created"
+echo ""
+echo "Server CSR Files created:"
+ls -la server.key server.csr
+
+# Step 3: Uncomment copy_extensions in openssl.cnf
+echo ""
+echo "=== Step 3: Enabling copy_extensions ==="
+sed -i 's/# copy_extensions = copy/copy_extensions = copy/' openssl.cnf
+echo "✓ Uncommented copy_extensions in openssl.cnf"
+
+# Step 4: Sign the CSR with CA to create server.crt
+echo ""
+echo "=== Step 4: Signing CSR with CA (Creating server.crt) ==="
 openssl ca -config openssl.cnf -policy policy_anything \
     -md sha256 -days 3650 \
     -in server.csr -out server.crt -batch \
-    -cert ca.crt -keyfile ca.key
-[111925 18:19|128.205.44.119|sujaldat][seed@VM]:Downloads$ ls
-ca.crt  ca.key  demoCA  Labsetup  Labsetup.zip  openssl.cnf  server.csr  server.key
-[111925 18:19|128.205.44.119|sujaldat][seed@VM]:Downloads$ sudo nano openssl.conf
-[111925 18:20|128.205.44.119|sujaldat][seed@VM]:Downloads$ sudo nano openssl.cnf
-[111925 18:21|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl req -newkey rsa:2048 -sha256 \
->     -keyout server.key -out server.csr \
->     -subj "/CN=www.sujaldat2025.com/O=Your Org/C=US" \
->     -passout pass:dees \
->     -addext "subjectAltName = DNS:www.sujaldat2025.com, \
->                               DNS:www.sujaldat2025A.com, \
->                               DNS:www.sujaldat2025B.com"
-Generating a RSA private key
-....................................................+++++
-..............................................................................................................................................................+++++
-writing new private key to 'server.key'
------
-[111925 18:21|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
-Can't open server.crt for reading, No such file or directory
-140342856365376:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
-140342856365376:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
-unable to load certificate
-[111925 18:22|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
-Can't open server.crt for reading, No such file or directory
-139747524814144:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
-139747524814144:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
-unable to load certificate
-[111925 18:22|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl req -newkey rsa:2048 -sha256     -keyout server.key -out server.csr     -subj "/CN=www.sujaldat2025.com/O=Your Org/C=US"     -passout pass:dees     -addext "subjectAltName = DNS:www.sujaldat2025.com, \
-                              DNS:www.sujaldat2025A.com, \
-                              DNS:www.sujaldat2025B.com"
-Generating a RSA private key
-.............+++++
-...............................................+++++
-writing new private key to 'server.key'
------
-[111925 18:23|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
-Can't open server.crt for reading, No such file or directory
-140043286975808:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
-140043286975808:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
-unable to load certificate
+    -cert ca.crt -keyfile ca.key -passin pass:dees
+
+echo "✓ Server certificate signed by CA"
+echo ""
+echo "All certificate files:"
+ls -la ca.* server.*
+
+echo ""
+echo "=== Reset Complete! You are now at Task 3.3 ==="
+echo ""
+echo "Verification - View your server certificate:"
+echo "Run: openssl x509 -in server.crt -text -noout"

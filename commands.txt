@@ -1,1 +1,7 @@
-e812ba8d00b270ef3502bb53ceb31e8c5188f14e
+openssl req -newkey rsa:2048 -sha256 \
+    -keyout server.key -out server.csr \
+    -subj "/CN=www.sujaldat2025.com/O=Your Org/C=US" \
+    -passout pass:dees \
+    -addext "subjectAltName = DNS:www.sujaldat2025.com, \
+                              DNS:www.sujaldat2025A.com, \
+                              DNS:www.sujaldat2025B.com"

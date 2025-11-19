@@ -2,3 +2,42 @@ openssl ca -config openssl.cnf -policy policy_anything \
     -md sha256 -days 3650 \
     -in server.csr -out server.crt -batch \
     -cert ca.crt -keyfile ca.key
+[111925 18:19|128.205.44.119|sujaldat][seed@VM]:Downloads$ ls
+ca.crt  ca.key  demoCA  Labsetup  Labsetup.zip  openssl.cnf  server.csr  server.key
+[111925 18:19|128.205.44.119|sujaldat][seed@VM]:Downloads$ sudo nano openssl.conf
+[111925 18:20|128.205.44.119|sujaldat][seed@VM]:Downloads$ sudo nano openssl.cnf
+[111925 18:21|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl req -newkey rsa:2048 -sha256 \
+>     -keyout server.key -out server.csr \
+>     -subj "/CN=www.sujaldat2025.com/O=Your Org/C=US" \
+>     -passout pass:dees \
+>     -addext "subjectAltName = DNS:www.sujaldat2025.com, \
+>                               DNS:www.sujaldat2025A.com, \
+>                               DNS:www.sujaldat2025B.com"
+Generating a RSA private key
+....................................................+++++
+..............................................................................................................................................................+++++
+writing new private key to 'server.key'
+-----
+[111925 18:21|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
+Can't open server.crt for reading, No such file or directory
+140342856365376:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
+140342856365376:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
+unable to load certificate
+[111925 18:22|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
+Can't open server.crt for reading, No such file or directory
+139747524814144:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
+139747524814144:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
+unable to load certificate
+[111925 18:22|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl req -newkey rsa:2048 -sha256     -keyout server.key -out server.csr     -subj "/CN=www.sujaldat2025.com/O=Your Org/C=US"     -passout pass:dees     -addext "subjectAltName = DNS:www.sujaldat2025.com, \
+                              DNS:www.sujaldat2025A.com, \
+                              DNS:www.sujaldat2025B.com"
+Generating a RSA private key
+.............+++++
+...............................................+++++
+writing new private key to 'server.key'
+-----
+[111925 18:23|128.205.44.119|sujaldat][seed@VM]:Downloads$ openssl x509 -in server.crt -text -noout
+Can't open server.crt for reading, No such file or directory
+140043286975808:error:02001002:system library:fopen:No such file or directory:crypto/bio/bss_file.c:69:fopen('server.crt','r')
+140043286975808:error:2006D080:BIO routines:BIO_new_file:no such file:crypto/bio/bss_file.c:76:
+unable to load certificate
